@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 IMU</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; }
+    #alert { font-size: 1.5em; font-weight: bold; color: red; height: 1.5em; }
+    canvas { border: 1px solid #999; }
+    #controls { margin: 15px; }
+    button { font-size: 1.1em; padding: 10px 20px; margin: 5px; }
+    #launchBtn { background: #2ecc71; color: white; border: none; border-radius: 6px; }
+    #abortBtn  { background: #e74c3c; color: white; border: none; border-radius: 6px; }
+    #status { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Orientation</h1>
+  <div id="alert"></div>
+
+  <div id="controls">
+    <button id="launchBtn" onclick="doLaunch()">LAUNCH</button>
+    <button id="abortBtn" onclick="doAbort()">ABORT</button>
+  </div>
+  <div id="status">Armed: NO</div>
+
+  <canvas id="c" width="200" height="200"></canvas>
+  <pre id="imu">Waiting for data...</pre>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+
+    function drawArrow(upX, upY) {
+      ctx.clearRect(0, 0, 200, 200);
+      ctx.beginPath();
+      ctx.arc(100, 100, 3, 0, 2 * Math.PI);
+      ctx.fill();
+      const tipX = 100 + upX * 90;
+      const tipY = 100 - upY * 90;
+      ctx.beginPath();
+      ctx.moveTo(100, 100);
+      ctx.lineTo(tipX, tipY);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'blue';
+      ctx.stroke();
+    }
+
+    async function doLaunch() {
+      await fetch('/launch');
+    }
+
+    async function doAbort() {
+      await fetch('/abort');
+    }
+
+    async function fetchData() {
+      const res = await fetch('/data');
+      const text = await res.text();
+      // "ax,ay,az,gx,gy,gz,temp,upx,upy,upz,tilt,armed,launched,apogee"
+      const v = text.split(',');
+      const [ax, ay, az, gx, gy, gz, temp, upx, upy, upz, tilt, armed, launched, apogee] = v;
+
+      document.getElementById('imu').innerText =
+        "Accel (g):  " + ax + ", " + ay + ", " + az + "\n" +
+        "Gyro (dps): " + gx + ", " + gy + ", " + gz + "\n" +
+        "Temp (C):   " + temp + "\n" +
+        "Tilt (deg): " + tilt;
+
+      drawArrow(parseFloat(upx), parseFloat(upy));
+
+      document.getElementById('status').innerText = "Armed: " + (armed === "1" ? "YES" : "NO");
+
+      let msg = "";
+      if (apogee === "1") msg = "APOGEE DETECTED";
+      else if (launched === "1") msg = "LAUNCHED";
+      document.getElementById('alert').innerText = msg;
+    }
+
+    fetchData();
+    setInterval(fetchData, 200);
+  </script>
+</body>
+</html>
